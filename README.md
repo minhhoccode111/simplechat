@@ -1,2 +1,3 @@
-# simplechat
-Simple chat using Go + Websocket
+# Simple Chat
+
+Practice Real-time with Gin + Svelte
