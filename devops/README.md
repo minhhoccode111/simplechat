@@ -2,18 +2,16 @@
 
 ## Makefile
 
-Run `make help` to see available commands.
+Run `make help` to see available commands. \
 
-**Start/stop:**
+Start/stop database
 
-- `make up-all` / `make down-all` - All services
-- `make be-up` / `make be-down` - Backend + database
-- `make db-up` / `make db-down` - Database only
+- `make db-up` / `make db-down`
 
 ## Scripts
 
-- `./init-volume-network.sh` - initialize persistent volume and network
-- `./rm-volume-network.sh` - remove persistent volume and network
-- `./logs-service.sh <service_name>` - check logs a service
-- `./exec-shell-service.sh <service_name>` - execute shell in service
+- `./init-volume.sh` - initialize persistent volume
+- `./rm-volume.sh` - remove persistent volume
+- `./logs-service.sh` - check logs db service
+- `./exec-shell-service.sh` - execute shell in db service
 - `./nuke-all.sh` - remove everything
