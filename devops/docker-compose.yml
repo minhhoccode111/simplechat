@@ -41,7 +41,8 @@ x-fe-env: &x-fe-env
 services:
   db:
     container_name: db
-    image: postgres:18.1-alpine
+    image: postgres:latest
+    restart: unless-stopped
     environment:
       <<: *x-db-env
     volumes:
