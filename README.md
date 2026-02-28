@@ -2,34 +2,56 @@
 
 Really simple chat app with Gin + Svelte
 
+## Makefile
+
+Run `make help` to see available commands. \
+
+Start/stop database
+
+- `make db-up` / `make db-down`
+
+## Scripts
+
+- `./init-volume.sh` - initialize persistent volume
+- `./rm-volume.sh` - remove persistent volume
+- `./logs-service.sh` - check logs db service
+- `./exec-shell-service.sh` - execute shell in db service
+- `./nuke-all.sh` - remove everything
+
+## Backend
+
+## Frontend
+
 ## Requirements
 
-Requirements:
-
-- [ ] just one global room chat
-- [ ] users get all messages
-- [ ] user send a message
-- [ ] user is identified by browser
-  - new tab → same user
-  - new browser → new user
-  - new tab in incognito → new user
-  - new tab in the same incognito → same user
-
-Extra:
-
-- [ ] user connect/disconnect events print to chat history
+- one global chat room
+- every actions get stored in the database
+- user:
+  - first visit
+  - redirect to `/config`
+  - user choose a name and submit
+  - redirect to `/`
+  - load the last 20 messages (paginated), scroll to bottom (scroll up to load older messages)
+  - `username has joined the chat`
+  - send/receive messages
+  - `username has left the chat`
 
 ## Database
 
-- Message
+- Event
   - id
+  - userid
+  - type (message, join, leave)
   - content
   - created
-  - user_id
+- User
+  - id
+  - username
+  - created
 
 ## Todo
 
-- [x] setup devops dir to start db fast
-- [x] setup backend dir
-- [x] setup database schema
-- [ ] setup frontend dir
+- [ ] Add `air`
+- [ ] Add migrations setup
+- [ ] Add db models
+- [ ] Add `sqlc`

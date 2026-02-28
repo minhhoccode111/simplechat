@@ -15,7 +15,7 @@ To recreate this project with the same configuration:
 
 ```sh
 # recreate this project
-pnpm dlx sv create --template minimal --types ts --add prettier eslint tailwindcss="plugins:typography,forms" sveltekit-adapter="adapter:static" devtools-json mdsvex mcp="ide:cursor,gemini,opencode+setup:remote" --install pnpm frontend
+pnpm dlx sv create --template minimal --types ts --add prettier eslint tailwindcss="plugins:typography,forms" sveltekit-adapter="adapter:node" devtools-json mdsvex mcp="ide:cursor,gemini,opencode+setup:remote" --install pnpm client
 ```
 
 ## Developing
