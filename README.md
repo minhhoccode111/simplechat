@@ -12,11 +12,8 @@ Start/stop database
 
 ## Scripts
 
-- `./init-volume.sh` - initialize persistent volume
-- `./rm-volume.sh` - remove persistent volume
-- `./logs-service.sh` - check logs db service
-- `./exec-shell-service.sh` - execute shell in db service
-- `./nuke-all.sh` - remove everything
+- `./logs.sh` - check logs db service
+- `./exec.sh` - execute shell in db service
 
 ## Backend
 
@@ -51,7 +48,7 @@ Start/stop database
 
 ## Todo
 
-- [ ] Add `air`
 - [ ] Add migrations setup
 - [ ] Add db models
 - [ ] Add `sqlc`
+- [ ] Add `air`
