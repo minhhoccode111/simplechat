@@ -1,6 +1,6 @@
 # Simple Chat
 
-Really simple chat app with Gin + Svelte
+Really simple chat app with Gin + Gorilla WebSockets + PostgreSQL + Sqlc + Svelte
 
 ## Makefile
 

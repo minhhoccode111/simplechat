@@ -15,19 +15,3 @@ db-up: ### Start db service
 db-down: ### Stop db service
 	$(LOCAL_STACK) down db
 .PHONY: db-down
-
-be-up: ### Start db + be services
-	$(LOCAL_STACK) up -d db be
-.PHONY: be-up
-
-be-down: ### Stop db + be services
-	$(LOCAL_STACK) down db be
-.PHONY: be-down
-
-up-all: ### Start all services (db + be + fe + nginx)
-	$(LOCAL_STACK) up --build -d && $(LOCAL_STACK) logs -f
-.PHONY: up-all
-
-down-all: ### Stop all services (db + be + fe + nginx)
-	$(LOCAL_STACK) down --remove-orphans
-.PHONY: down-all
