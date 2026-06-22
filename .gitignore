@@ -34,3 +34,4 @@ simplechat
 # .idea/
 # .vscode/
 .aider*
+tmp/
