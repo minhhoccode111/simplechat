@@ -42,8 +42,9 @@
         font-weight: bold;
         color: #333;
       }
-      #messages .self .username {
+      #messages .self {
         color: #060;
+        text-align: right;
       }
       #message-send {
         display: flex;
@@ -146,7 +147,13 @@
       function sendMessage() {
         const text = inputEl.value.trim();
         if (!text || !ws) return;
-        ws.send(JSON.stringify({ type: "message", content: text }));
+        ws.send(
+          JSON.stringify({
+            type: "message",
+            content: text,
+            username: username,
+          }),
+        );
         inputEl.value = "";
         inputEl.focus();
       }
