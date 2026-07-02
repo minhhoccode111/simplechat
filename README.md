@@ -35,3 +35,47 @@ the root cause.
 **Lesson:** An unbuffered Go channel requires the sender and receiver to be
 in DIFFERENT goroutines. Sending through a channel from within the same
 goroutine that is supposed to receive from it will deadlock.
+
+## Architecture Evolution
+
+### V1: Blunt approach
+
+First version stored `*websocket.Conn` directly in hub's client map, keyed by
+auto-increment string ID. Hub's `broadcast()` called `conn.WriteJSON` directly
+in a loop. Single goroutine per client (the HTTP handler) did both reading and
+writing — blocking on `ReadJSON`, then sending to hub's broadcast channel,
+then blocking on that send until hub processed it.
+
+Problems:
+
+- Hub blocks on slowest client — one slow reader holds up every broadcast
+- `register()` deadlocked on `broadcastCh` because hub sent to its own channel
+- No per-client buffering, no backpressure
+
+### V2: Client struct + per-client send channel
+
+Refactored to introduce a `Client` struct that wraps connection + context:
+
+```
+Client {
+    conn     *websocket.Conn
+    send     chan Message      // buffered (cap 256)
+    username string
+}
+```
+
+Two goroutines per client:
+
+- `readPump()` — reads from conn, sends to hub
+- `writePump()` — reads from `send` channel, writes to conn
+
+Hub never calls `WriteJSON` directly. Hub sends to each client's `send`
+channel instead. The `writePump` goroutine is the sole writer to `conn`,
+eliminating races and blocking.
+
+Per-client buffered channel solves the slow client problem — hub enqueues and
+moves on. If channel fills up, `select/default` drops the slow client.
+
+**Key insight:** Separate the concerns — hub manages fan-out, each client
+manages its own socket. Channels between them keep things decoupled and
+non-blocking.

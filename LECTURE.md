@@ -140,14 +140,14 @@ They share the `Conn` — gorilla handles concurrent access with locks.
 ## Slide 8: Concurrency Model — Hub
 
 ```
-                        ┌───────────┐
-              register→│           │
-  Client ──────────────→│           │
-                        │   Hub     │──broadcast→ all clients
+                        ┌─────────────┐
+               register→│             │
+  Client ──────────────→│             │
+                        │   Hub       │──broadcast→ all clients
   Client ──────────────→│  (goroutine)│
-            unregister→│           │
-  Client ──────────────→│           │
-                        └───────────┘
+             unregister→│             │
+  Client ──────────────→│             │
+                        └─────────────┘
 ```
 
 - Hub is a **goroutine** that owns client state
@@ -178,11 +178,11 @@ func (h *Hub) Run() {
         case msg := <-h.broadcast:
             for client := range h.clients {
                 select {
-                case client.send <- msg:
-                default:
-                    // client too slow → disconnect
-                    delete(h.clients, client)
-                    close(client.send)
+                    case client.send <- msg:
+                    default:
+                        // client too slow → disconnect
+                        delete(h.clients, client)
+                        close(client.send)
                 }
             }
         }
@@ -284,7 +284,7 @@ Browser A                Server                   Browser B
    │                       │ hub.broadcast ← "hi"    │
    │                       │ client.send ← "hi"      │
    │                       │    for each B's chan    │
-   │                       │ WriteJSON("hi")─────────→│
+   │                       │ WriteJSON("hi")────────→│
    │                       │                         │ Display "hi"
    │                       │                         │
 ```
@@ -356,7 +356,7 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-**Per connection**: 1 HTTP upgrade + 2 goroutines + 1 buffered channel.
+**Per connection**: 1 HTTP upgrade + 2 goroutines + 1 buffered channel. Worth noting: `serveWs` is fire-and-forget from HTTP perspective.
 
 **Three concurrent things per client**:
 

@@ -3,91 +3,116 @@ package main
 import (
 	"log"
 	"net/http"
-	"strconv"
+	"sync"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
-type message struct {
+type Message struct {
 	Type     string `json:"type"`
 	Content  string `json:"content"`
 	Username string `json:"username"`
 }
 
-type hub struct {
-	n            int
-	clients      map[string]*websocket.Conn
-	registerCh   chan *websocket.Conn
-	unregisterCh chan *websocket.Conn
-	broadcastCh  chan message
-	closeCh      chan struct{}
+func NewMessage(messageType, content, username string) Message {
+	return Message{Type: messageType, Content: content, Username: username}
 }
 
-func newHub() *hub {
-	return &hub{
-		clients:      make(map[string]*websocket.Conn),
-		registerCh:   make(chan *websocket.Conn, 10),
-		unregisterCh: make(chan *websocket.Conn, 10),
-		broadcastCh:  make(chan message, 10),
-		closeCh:      make(chan struct{}),
+type Client struct {
+	hub      *Hub
+	conn     *websocket.Conn
+	send     chan Message
+	username string
+}
+
+func NewClient(hub *Hub, conn *websocket.Conn) *Client {
+	return &Client{
+		hub:      hub,
+		conn:     conn,
+		send:     make(chan Message, 256),
+		username: generateUsername(),
 	}
 }
 
-func (h *hub) run() {
-	go func() {
-		for {
-			select {
-			case c := <-h.registerCh:
-				h.register(c)
-			case c := <-h.unregisterCh:
-				h.unregister(c)
-			case m := <-h.broadcastCh:
-				h.broadcast(m)
-			case <-h.closeCh:
-				log.Println("exiting hub.run()")
-				return
-			}
-		}
+func (c *Client) readPump() {
+	defer func() {
+		c.hub.unregisterCh <- c
+		c.conn.Close()
 	}()
+
+	for {
+		var msg Message
+
+		err := c.conn.ReadJSON(&msg)
+		if err != nil {
+			break
+		}
+
+		c.hub.broadcastCh <- msg
+	}
 }
 
-func (h *hub) register(c *websocket.Conn) {
-	h.n++
-	id := strconv.Itoa(h.n)
-	h.clients[id] = c
-	// selft
-	c.WriteJSON(message{Type: "set-username", Content: id, Username: id})
-	// everyone, call h.broadcast directly to prevent deadlock
-	h.broadcast(message{Type: "system", Content: "Welcome user " + id})
-}
+func (c *Client) writePump() {
+	defer func() {
+		c.conn.Close()
+	}()
 
-func (h *hub) unregister(c *websocket.Conn) {
-	var id string
-	for k, v := range h.clients {
-		if v == c {
-			id = k
+	for m := range c.send {
+		err := c.conn.WriteJSON(m)
+		if err != nil {
+			break
 		}
 	}
-	delete(h.clients, id)
-	// everyone, call h.broadcast directly to prevent deadlock
-	h.broadcast(message{Type: "system", Content: "Goodbye user " + id})
 }
 
-func (h *hub) broadcast(m message) {
-	for k, v := range h.clients {
-		err := v.WriteJSON(m)
-		if err != nil {
-			log.Printf("error writing to %s client", k)
+type Hub struct {
+	clients      map[*Client]bool
+	registerCh   chan *Client
+	unregisterCh chan *Client
+	broadcastCh  chan Message
+	mu           sync.RWMutex
+}
+
+func NewHub() *Hub {
+	return &Hub{
+		clients:      make(map[*Client]bool),
+		registerCh:   make(chan *Client),
+		unregisterCh: make(chan *Client),
+		broadcastCh:  make(chan Message),
+	}
+}
+
+func (h *Hub) Run() {
+	for {
+		select {
+		case c := <-h.registerCh:
+			h.clients[c] = true
+			h.broadcastCh <- NewMessage("system", "Welcome "+c.username, "")
+		case c := <-h.unregisterCh:
+			delete(h.clients, c)
+			close(c.send)
+			h.broadcastCh <- NewMessage("system", "Goodbye "+c.username, "")
+		case m := <-h.broadcastCh:
+			for c := range h.clients {
+				select {
+				// try to send to client's send channel
+				case c.send <- m:
+				// if client is too slow (buffer 256 full), default to drop it
+				default:
+					delete(h.clients, c)
+					close(c.send)
+					h.broadcastCh <- NewMessage("system", "Goodbye "+c.username, "")
+				}
+			}
 		}
 	}
 }
 
 func main() {
 	var upgrader = websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
-
-	h := newHub()
-	h.run()
-	defer close(h.closeCh)
+	hub := NewHub()
+	go hub.Run()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "index.html")
@@ -100,23 +125,12 @@ func main() {
 			return
 		}
 
-		defer func() {
-			h.unregisterCh <- conn
-		}()
+		c := NewClient(hub, conn)
+		hub.registerCh <- c
+		go c.readPump()
+		go c.writePump()
 
-		h.registerCh <- conn
-
-		for {
-			var m message
-
-			err := conn.ReadJSON(&m)
-			if err != nil {
-				log.Printf("error reading JSON: %v", err)
-				break
-			}
-
-			h.broadcastCh <- m
-		}
+		c.send <- NewMessage("set-username", c.username, "")
 	})
 
 	err := http.ListenAndServe(":8000", nil)
@@ -124,3 +138,5 @@ func main() {
 		log.Printf("error ListenAndServe: %v", err)
 	}
 }
+
+func generateUsername() string { return uuid.NewString()[:5] }
