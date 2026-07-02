@@ -36,6 +36,26 @@ the root cause.
 in DIFFERENT goroutines. Sending through a channel from within the same
 goroutine that is supposed to receive from it will deadlock.
 
+### Mixed Content: HTTPS page blocks insecure WebSocket (ws://)
+
+**Problem:** After deploying behind nginx with HTTPS, the browser console shows:
+
+```
+Mixed Content: The page at 'https://simplechat.minhhoccode111.com/'
+was loaded over HTTPS, but attempted to connect to the insecure WebSocket
+endpoint 'ws://simplechat.minhhoccode111.com/ws'.
+```
+
+**Cause:** Browsers enforce the same security policy for WebSocket as for HTTP. An HTTPS page may only open WebSocket connections to `wss://` (TLS-encrypted) endpoints. The `ws://` protocol is plaintext, same as `http://`.
+
+The relationship is parallel:
+- `http://` → `https://` (TLS)
+- `ws://` → `wss://` (TLS)
+
+**Fix:** Change `ws://` → `wss://` in the WebSocket URL on the client side.
+
+Nginx terminates TLS and proxies to the Go app over plain HTTP/WebSocket on `127.0.0.1:8082`. The Go app never sees TLS — nginx handles the `ws://` ↔ `wss://` conversion. No server-side changes needed.
+
 ## Architecture Evolution
 
 ### V1: Blunt approach

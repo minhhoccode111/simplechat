@@ -98,7 +98,7 @@
 
       function connect() {
         statusEl.textContent = "Connecting...";
-        ws = new WebSocket("ws://" + location.host + "/ws");
+        ws = new WebSocket("wss://" + location.host + "/ws");
 
         ws.onopen = () => {
           statusEl.textContent = "Connected";

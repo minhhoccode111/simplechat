@@ -1,0 +1,14 @@
+[Unit]
+Description=Simple Chat
+After=network.target
+
+[Service]
+Type=simple
+User=mhc
+WorkingDirectory=/opt/simplechat
+ExecStart=/usr/local/bin/simplechat
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -79,7 +79,7 @@ func NewHub() *Hub {
 		clients:      make(map[*Client]bool),
 		registerCh:   make(chan *Client),
 		unregisterCh: make(chan *Client),
-		broadcastCh:  make(chan Message),
+		broadcastCh:  make(chan Message, 256),
 	}
 }
 
@@ -133,7 +133,7 @@ func main() {
 		c.send <- NewMessage("set-username", c.username, "")
 	})
 
-	err := http.ListenAndServe(":8000", nil)
+	err := http.ListenAndServe("127.0.0.1:8082", nil)
 	if err != nil {
 		log.Printf("error ListenAndServe: %v", err)
 	}
