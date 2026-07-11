@@ -3,11 +3,17 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
+
+const pongWait = 60 * time.Second
+const pingPeriod = pongWait / 10 * 9
+const writeWait = 10 * time.Second
 
 type Message struct {
 	Type     string `json:"type"`
@@ -41,6 +47,30 @@ func (c *Client) readPump() {
 		c.conn.Close()
 	}()
 
+	err := c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	if err != nil {
+		return
+	}
+
+	c.conn.SetPongHandler(func(appData string) error {
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
+
+	done := make(chan struct{})
+	defer close(done)
+	ticker := time.NewTicker(pingPeriod)
+	defer ticker.Stop()
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				c.conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
+			case <-done:
+				return
+			}
+		}
+	}()
+
 	for {
 		var msg Message
 
@@ -54,9 +84,7 @@ func (c *Client) readPump() {
 }
 
 func (c *Client) writePump() {
-	defer func() {
-		c.conn.Close()
-	}()
+	defer c.conn.Close()
 
 	for m := range c.send {
 		err := c.conn.WriteJSON(m)
@@ -110,6 +138,11 @@ func (h *Hub) Run() {
 }
 
 func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8088"
+	}
+
 	var upgrader = websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
 	hub := NewHub()
 	go hub.Run()
@@ -133,7 +166,7 @@ func main() {
 		c.send <- NewMessage("set-username", c.username, "")
 	})
 
-	err := http.ListenAndServe("127.0.0.1:8082", nil)
+	err := http.ListenAndServe("127.0.0.1:"+port, nil)
 	if err != nil {
 		log.Printf("error ListenAndServe: %v", err)
 	}

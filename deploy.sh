@@ -9,13 +9,14 @@ echo "== Building for linux amd64..."
 GOOS=linux GOARCH=amd64 go build -o $BINARY .
 
 echo "== Copying files..."
-scp $BINARY index.html simplechat.nginx.conf simplechat.service $SERVER:/tmp/
+scp $BINARY index.html simplechat.nginx.conf simplechat.service .env.prod $SERVER:/tmp/
 
 echo "== Deploying..."
 ssh $SERVER "
 sudo mkdir -p $REMOTE_DIR
 sudo mv /tmp/$BINARY /usr/local/bin/
 sudo mv /tmp/index.html $REMOTE_DIR/
+sudo mv /tmp/.env.prod $REMOTE_DIR/.env
 sudo mv /tmp/simplechat.nginx.conf /etc/nginx/sites-available/simplechat
 sudo ln -sf /etc/nginx/sites-available/simplechat /etc/nginx/sites-enabled/
 sudo mv /tmp/simplechat.service /etc/systemd/system/

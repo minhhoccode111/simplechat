@@ -49,12 +49,39 @@ endpoint 'ws://simplechat.minhhoccode111.com/ws'.
 **Cause:** Browsers enforce the same security policy for WebSocket as for HTTP. An HTTPS page may only open WebSocket connections to `wss://` (TLS-encrypted) endpoints. The `ws://` protocol is plaintext, same as `http://`.
 
 The relationship is parallel:
+
 - `http://` → `https://` (TLS)
 - `ws://` → `wss://` (TLS)
 
 **Fix:** Change `ws://` → `wss://` in the WebSocket URL on the client side.
 
 Nginx terminates TLS and proxies to the Go app over plain HTTP/WebSocket on `127.0.0.1:8082`. The Go app never sees TLS — nginx handles the `ws://` ↔ `wss://` conversion. No server-side changes needed.
+
+### Nginx proxy timeout: idle WebSocket disconnects every 60s
+
+**Problem:** In production behind nginx, the WebSocket connection drops every 60 seconds of inactivity. The browser's `onclose` handler reconnects every 3s with a new guest username, producing a stream of "Welcome" messages for different users.
+
+```
+Welcome 59b06
+Welcome 395e2
+Welcome 42f52
+Welcome 74eb1
+...
+```
+
+**Cause:** Nginx's default `proxy_read_timeout` is 60s. If the proxy receives no data from the backend within that window, it closes the connection. A WebSocket that's connected but idle (no one typing) hits this timeout.
+
+**Not a fix — proxy timeout increase:** Setting `proxy_read_timeout 86400s` in the nginx config only delays the problem.
+
+**Real fix — WebSocket ping/pong keepalive:** The server sends a WebSocket ping control frame every 54s. The browser auto-responds with a pong. The pong handler resets the read deadline. This keeps the connection alive indefinitely and also detects truly dead peers (no response within 60s).
+
+Key gorilla/websocket APIs:
+
+- `conn.SetReadDeadline` — how long the server waits for any data
+- `conn.SetPongHandler` — callback that fires on pong, extends deadline
+- `conn.WriteControl(websocket.PingMessage, ...)` — sends ping immediately via control frame
+
+**Gotcha — goroutine leak:** The ticker that drives pings runs in a separate goroutine. `ticker.Stop()` does not close the ticker channel, so `for range ticker.C` blocks forever. A `done` channel closed via `defer` is needed to terminate the goroutine when `readPump` exits.
 
 ## Architecture Evolution
 
