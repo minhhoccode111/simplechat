@@ -6,7 +6,7 @@ random guest nicknames, inline HTML
 ## Concepts Learned
 
 - Golang + Websocket
-- Simple deploy script that copy the binary to production vps
+- Deploy Go binary to VPS with Docker (scratch image) + Caddy reverse proxy
 - QA.md
 
 ## Bugs Encountered
@@ -126,3 +126,49 @@ moves on. If channel fills up, `select/default` drops the slow client.
 **Key insight:** Separate the concerns — hub manages fan-out, each client
 manages its own socket. Channels between them keep things decoupled and
 non-blocking.
+
+## Deployment
+
+### Architecture
+
+```
+Browser (wss://) ── Caddy (TLS) ── 127.0.0.1:8082 ── Docker container (127.0.0.1:8082)
+```
+
+- **Caddy** handles TLS termination and reverse-proxies to the Go binary on `127.0.0.1:8082`
+- **Docker** runs the Go binary in a `FROM scratch` image with `--network=host` (no port mapping needed)
+- The binary binds to `127.0.0.1` inside the container; host networking makes this the host's loopback
+
+### Deploy script (`deploy.sh`)
+
+| Step   | What happens                                                                             |
+| ------ | ---------------------------------------------------------------------------------------- |
+| Build  | `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build` — statically linked, no libc dependency |
+| Copy   | `scp` binary, `index.html`, `Dockerfile`, Caddy snippet, `.env.prod` to VPS `/tmp/`      |
+| Deploy | `docker build -t simplechat:latest` → `docker run --network=host --restart=always`       |
+| Caddy  | Compare-snippet via `diff`, copy to `/etc/caddy/snippets/` if changed, `reload caddy`    |
+
+### Docker image
+
+```dockerfile
+FROM scratch
+COPY simplechat /simplechat
+COPY index.html /index.html
+ENV TZ=Asia/Ho_Chi_Minh
+ENTRYPOINT ["/simplechat"]
+```
+
+- `FROM scratch` — no OS, no shell, minimal attack surface (~6MB image)
+- Timezone data is embedded in the binary via `import _ "time/tzdata"` in `main.go`
+- Environment (e.g. `PORT=8082`) loaded at runtime via `--env-file /opt/simplechat/.env`
+
+### Caddy snippet
+
+```
+@simplechat host simplechat.minhhoccode111.com
+handle @simplechat {
+    reverse_proxy 127.0.0.1:8082
+}
+```
+
+Deployed to `/etc/caddy/snippets/simplechat.minhhoccode111.com`. The deploy script only overwrites and reloads Caddy if the snippet content changed (using `diff`).

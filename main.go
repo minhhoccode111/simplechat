@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
