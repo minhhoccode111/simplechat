@@ -1,0 +1,15 @@
+[Unit]
+Description=SimpleChat
+After=network.target
+
+[Service]
+Type=simple
+User=mhc
+WorkingDirectory=/opt/simplechat
+EnvironmentFile=/opt/simplechat/.env
+ExecStart=/opt/simplechat/simplechat
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
